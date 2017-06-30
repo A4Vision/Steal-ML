@@ -15,7 +15,22 @@ logger.setLevel(logging.ERROR)
 
 
 class LinearTrainer(OfflineBase):
+    """
+    Trains a linear classifier and returns the result
+    (over training, validation and test).
+    """
     def __init__(self, name, x, y, val_x, val_y, test_x, test_y, n_features):
+        """
+
+        :param name:
+        :param x: training data
+        :param y: training labels
+        :param val_x: validation data
+        :param val_y: validation labels
+        :param test_x: test data
+        :param test_y: test labels
+        :param n_features: number of features
+        """
         super(self.__class__, self).__init__(x, y, val_x, val_y)
 
         self.name = name
@@ -24,10 +39,20 @@ class LinearTrainer(OfflineBase):
         self.test_y = test_y
 
     def grid_search(self):
+        """
+        Select the "best" linear classifier, minimizing
+            ||w|| ** 2 + C * SUM_i(hinge_loss(x_i, y_i) ** 2)
+        Minimize
+        :return:
+        """
         C_range = np.logspace(-5, 15, 21, base=2)
         param_grid = dict(C=C_range)
-        cv = StratifiedShuffleSplit(self.y_ex, n_iter=5, test_size=0.2, random_state=42)
-        grid = GridSearchCV(LinearSVC(dual=False, max_iter=10000), param_grid=param_grid,
+        cv = StratifiedShuffleSplit(self.y_ex, n_iter=5,
+                                    test_size=0.2, random_state=42)
+        # LinearSVC is an SVM optimizer that minimizes:
+        #   ||w|| ** 2 + C * SUM_i(hinge_loss(x_i, y_i) ** 2)
+        grid = GridSearchCV(LinearSVC(dual=False, max_iter=10000),
+                            param_grid=param_grid,
                             cv=cv,
                             n_jobs=1, verbose=0)
 

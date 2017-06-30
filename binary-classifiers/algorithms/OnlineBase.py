@@ -15,11 +15,23 @@ from collections import deque
 
 class OnlineBase(object):
     def __init__(self, name, label_p, label_n, clf1, n_features, ftype, error):
+        """
+
+        :param name:
+        :param label_p:
+        :param label_n:
+        :param clf1: The black-box prediction function.
+        :param n_features:
+        :param ftype: Features Type - How to randomize inputs -
+        uniform distribution, Gaussian distribution or bernouli(0.5)
+        :param error:
+        """
         assert ftype in ('uniform', 'norm', 'binary')
         self.name = name
         self.clf1 = clf1
 
         self.NEG, self.POS = label_n, label_p
+        # Count how many times
         self.q = 0
 
         self.e = error
@@ -27,6 +39,7 @@ class OnlineBase(object):
         self.ftype = ftype
 
         # budget
+        # Probably how many many queries we are allowed to send.
         self.budget = -1
 
         # extraction results. Pure python lists XXX
@@ -43,6 +56,16 @@ class OnlineBase(object):
             self.budget += b
 
     def random_vector(self, length, label=None, spec=None):
+        """
+        Creates a random input vector, with specified randomization
+        parameters (spec), and a specified output label as predicted by
+        query().
+        :param length:
+        :param label:
+        :param spec:
+        of type FeatureSpec.
+        :return:
+        """
         if spec is not None:
             self.ftype = spec.type
             mean = spec.mean
@@ -112,13 +135,26 @@ class OnlineBase(object):
 
         return label
 
-    def push_to_b(self, xn, xp, e):
+    def push_to_b(self, xn, xp, epsilon):
+        """
+        Find a point on the decision boundary using binary line search.
+        Push to Boundary.
+        :param xn:
+         Negative inputs.
+        :param xp:
+         Positive inputs.
+        :param epsilon:
+            upper bound for the ratio
+                distance(xn, xp) / sqrt(n) <? epsilon
+        :return:
+        """
         assert self.query(xn, count=False) == self.NEG
         assert self.query(xp, count=False) == self.POS
-
-        d = distance.euclidean(xn, xp) / \
-            distance.euclidean(np.ones(self.n_features), np.zeros(self.n_features))
-        if d < e:
+        # Euclidiean distance / sqrt(n)
+        # If x is bounded in 0 < x_i < 1 then  sqrt(n) is the maximal distance.
+        d = distance.euclidean(xn, xp) / self.n_features ** 0.5
+            # distance.euclidean(np.ones(self.n_features), np.zeros(self.n_features))
+        if d < epsilon:
             logger.debug('bin search done with %f', d)
             return xn, xp
 
@@ -126,14 +162,20 @@ class OnlineBase(object):
         try:
             l = self.query(mid)
             if l == self.NEG:
-                return self.push_to_b(mid, xp, e)
+                return self.push_to_b(mid, xp, epsilon)
             else:
-                return self.push_to_b(xn, mid, e)
+                return self.push_to_b(xn, mid, epsilon)
         except RunOutOfBudget:
             logger.debug('Run out of budget %d, push_to_b failed' % self.budget)
             raise RunOutOfBudget
 
     def collect_pts(self, n, budget=-1):
+        """
+        Collects n points near the decision boundary.
+        :param n:
+        :param budget:
+        :return:
+        """
         self.set_budget(budget)
         if n == -1:
             assert budget > 0, 'exhaust without budget is doomed.'
@@ -160,6 +202,8 @@ class OnlineBase(object):
                 xb1, xb2 = self.push_to_b(x1, x2, self.e)
                 logger.debug('push consumed %d queries' % (self.q - q))
             except RunOutOfBudget:
+                # Why do we limit our selves with a budget if we run locally
+                # to find points on the decision boundary.
                 logger.debug('Run out of budget, collecting point has to stop. %d pairs collected', i)
                 break
             logger.debug('boundary pair no. %d found', i)
@@ -176,6 +220,8 @@ class OnlineBase(object):
 
     def random_vector_n_pairs(self, n, length):
         """
+        like random_vector(), but might save factor 2 of running time.
+        Generates random_vector()
         generates n pairs of random vectors. Efficient.
         :return:
         """
@@ -210,6 +256,10 @@ class OnlineBase(object):
         return negs, poss
 
     def collect_one_pair(self):
+        """
+        Generate a single pair near the decision boundary.
+        :return:
+        """
         x1 = self.random_vector(self.n_features)
         if self.clf1(x1) == self.NEG:
             next = self.POS
@@ -219,11 +269,18 @@ class OnlineBase(object):
         self.set_budget(50)
         try:
             x2 = self.random_vector(self.n_features, next)
+            # BUG: If label of x1 is positive - this is wrong.
             return self.push_to_b(x1, x2, self.e)
         except RunOutOfBudget:
             return [x1]
 
     def collect_up_to_budget(self, budget):
+        """
+        Like collect_pts: collect pairs of points near the decision boundary
+        using the given budeget of queries.
+        :param budget:
+        :return:
+        """
         self.set_budget(budget)
         neg_q = deque()
         pos_q = deque()
@@ -246,6 +303,18 @@ class OnlineBase(object):
                 break
 
     def collect_pts_frugal(self, n, budget=-1):
+        """
+        Generate ~n pairs near the decision boundary:
+        Algorithm:
+
+            1. randomize sqrt(n) negatives
+            2. randomize sqrt(n) positives
+            3. for each pair of negative, positive - find a
+                pair on the decision boundary  [using push_to_b]
+        :param n:
+        :param budget:
+        :return:
+        """
         self.set_budget(budget)
         if n == -1:
             assert budget > 0, 'exhaust without budget is doomed.'
@@ -262,7 +331,8 @@ class OnlineBase(object):
 
         from math import sqrt, ceil
 
-        negs, poss = self.random_vector_n_pairs(ceil((sqrt(n))), self.n_features)
+        negs, poss = self.random_vector_n_pairs(
+            ceil((sqrt(n))), self.n_features)
 
         n_got = 0
         if exhaust:
@@ -321,5 +391,8 @@ class RunOutOfBudget(Exception):
 class FeatureSpec(object):
     def __init__(self, type, range, mean):
         self.type = type
+        # Used only for uniform randomization
         self.range = range
+        # Used only for normal (Gaussian) randomization
+        # vector of means. self.mean[i] is the mean of the i'th feature.
         self.mean = mean

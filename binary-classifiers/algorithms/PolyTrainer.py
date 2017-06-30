@@ -24,6 +24,11 @@ class PolyTrainer(OfflineBase):
         self.test_y = test_y
 
     def grid_search(self):
+        """
+        POlynomial kernel of degree 3.
+        Grid search over C list on SVC(kernel = poly)
+        :return:
+        """
         C_range = np.logspace(-5, 15, 21, base=2)
         param_grid = dict(C=C_range)
         cv = StratifiedShuffleSplit(self.y_ex, n_iter=5, test_size=0.2, random_state=42)

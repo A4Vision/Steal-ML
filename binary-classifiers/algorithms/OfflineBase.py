@@ -11,6 +11,15 @@ class OfflineMethods:
 
 class OfflineBase(object):
     def __init__(self, oracle, X_ex, y_ex, X_test, y_test, n_features):
+        """
+
+        :param oracle:
+        :param X_ex: training data
+        :param y_ex: training labels
+        :param X_test: test data
+        :param y_test: test labels
+        :param n_features: number of features.
+        """
         self.X_ex = X_ex
         self.y_ex = y_ex
         self.X_test = X_test
@@ -31,6 +40,11 @@ class OfflineBase(object):
         pass
 
     def benchmark(self):
+        """
+        Compare the extracted predictor self.clf2 with the original model self.oracle.
+        Compare on 1000 random inputs (uniform between -1, to 1) and on the test set.
+        :return:
+        """
         # L_unif
         assert self.clf2 is not None
         X_unif = np.random.uniform(-1, 1, (1000, self.n_features))

@@ -28,9 +28,19 @@ class MidpointNormalize(Normalize):
 
 class GridRBFSolver(OnlineBase):
     def __init__(self, name, clf1, data, label, ftype, error):
-        super(self.__class__, self).__init__(name, clf1, data, label, ftype, error)
+        super(self.__class__, self).__init__(name, clf1, data,
+                                             label, ftype, error)
 
     def do(self, n_pts):
+        """
+        Extract the model by training our model
+        with n pairs of points on the decision boundary
+        of the ATTACKED MODEL.
+        :param n_pts:
+        :return:
+        """
+        # Collect n pairs of points on the decision boundary of the oracle
+        # WTF ?! We expected the contrary.
         X, y = self.collect_pts(n_pts)
 
         print 'done collecting points'
@@ -66,9 +76,12 @@ class GridRBFSolver(OnlineBase):
 
 
 def run(train_data, test_data, n_features, gamma, C, feature_type='uniform'):
+    # Load the data.
     X, Y = load_svmlight_file(train_data, n_features=n_features)
     Xt, Yt = load_svmlight_file(test_data, n_features=n_features)
+    # Create the  black-box to attack.
     rbf_svc = svm.SVC(kernel='rbf', gamma=gamma, C=C).fit(X, Y)
+    # Hack the black-box
     ex = GridRBFSolver(train_data, rbf_svc.predict, Xt, Yt, feature_type, 1e-9)
     ex.do(1500)
 

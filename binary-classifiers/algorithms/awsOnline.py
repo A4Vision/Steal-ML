@@ -10,7 +10,23 @@ logger.setLevel(logging.INFO)
 
 
 class AWSOnline(OnlineBase):
+    """
+    Interface to online AWS Model
+    batch_predict: Label only results from an AWS model.
+    collect_with_score: Exact probabilities for n random inputs.
+
+    """
     def __init__(self, model_id, label_p, label_n, n_features, val_name, ftype, error):
+        """
+
+        :param model_id:
+        :param label_p:
+        :param label_n:
+        :param n_features:
+        :param val_name: iterable of values.
+        :param ftype:
+        :param error:
+        """
         self.aws_client = boto3.client('machinelearning')
         super(self.__class__, self).__init__(model_id, label_p, label_n, None, n_features, ftype, error)
         self.val_name = val_name
@@ -24,11 +40,18 @@ class AWSOnline(OnlineBase):
                 Record=record,
                 PredictEndpoint='https://realtime.machinelearning.us-east-1.amazonaws.com'
             )
+
             return int(response['Prediction']['predictedLabel'])
 
         self.clf1 = predict
 
     def collect_with_score(self, n, spec=None):
+        """
+        Collect exact probabilities for n random inputs.
+        :param n:
+        :param spec:
+        :return:
+        """
         X = []
 
         collected = 0

@@ -10,6 +10,9 @@ from svmutil import svm_load_model, svm_predict
 
 
 class LibSVMOnline(OnlineBase):
+    """
+    Interface for an SVM classifier.
+    """
     def __init__(self, name, model, labels, n_features, ftype, error):
         _p, _n = labels
         super(self.__class__, self).__init__(name, _p, _n, None, n_features, ftype, error)
@@ -26,6 +29,12 @@ class LibSVMOnline(OnlineBase):
         self.clf1 = clf
 
     def batch_predict(self, xs, count=True):
+        """
+        Predict LABELS for given inputs.
+        :param xs: list of inputs.
+        :param count:
+        :return:
+        """
         if hasattr(xs, 'tolist'):
             xs = xs.tolist()
         xs = [ x.tolist() if hasattr(x, 'tolist') else x for x in xs]

@@ -11,9 +11,26 @@ logger.setLevel(logging.INFO)
 
 class PolySolver(OfflineBase):
     def __init__(self, name, x, y, val_x, val_y, test_x, test_y, fmap, n_features):
+        """
+
+        :param name:
+        :param x:
+        :param y:
+        :param val_x:
+        :param val_y:
+        :param test_x:
+        :param test_y:
+        :param fmap: function that returns the monoms of a data point.
+        For example, fmap([x1, x2, 3]) == [x1, x2, x3, x1 * x2, x1 * x3,
+        x3 * x2, x1 * x1, ...]
+        This is for training a linear classifier over the monoms.
+
+        :param n_features:
+        """
         super(self.__class__, self).__init__(x, y, val_x, val_y)
 
         self.name = name
+        # ?
         self.fmap = fmap
         self.n_features = n_features
 
@@ -64,7 +81,14 @@ class PolySolver(OfflineBase):
     #     return r
 
     def grid_retrain_in_f(self):
-        q = map(self.fmap, self.X_ex)
+        """
+        Trains a linear classifier over a polynomial kernel.
+        In other words, a polynomial classifier.
+        Returns the performance result over the
+        training, validation and test sets.
+        :return:
+        """
+        mapped_X_ex = map(self.fmap, self.X_ex)
         if hasattr(self.test_x, 'tolist'):
             test = self.test_x.tolist()
         else:
@@ -77,7 +101,7 @@ class PolySolver(OfflineBase):
         t = map(self.fmap, test)
         v = map(self.fmap, val_x)
         from algorithms.LinearTrainer import LinearTrainer
-        l = LinearTrainer(self.name, q, self.y_ex,
+        l = LinearTrainer(self.name, mapped_X_ex, self.y_ex,
                           v, self.val_y,
                           t, self.test_y, self.n_features)
 
@@ -86,12 +110,26 @@ class PolySolver(OfflineBase):
         return r
 
     def calc_solve_score(self):
+        """
+        Accuracy of training data
+        :return:
+        """
         return self.batch_eval(self.X_ex, self.y_ex)
 
     def calc_test_score(self):
+        """
+        Accuracy of test data
+        :return:
+        """
         return self.batch_eval(self.test_x, self.test_y)
 
     def batch_eval(self, x, y):
+        """
+        Returns Accuracy(predict(x), y)
+        :param x: list of data points.
+        :param y:
+        :return:
+        """
         score = 0.0
         yy = [self.predict(d) for d in x]
         for y1, y2 in zip(yy, y):
@@ -103,6 +141,11 @@ class PolySolver(OfflineBase):
         return score
 
     def predict(self, x):
+        """
+        Returns sign(W * fmap(x) + b))
+        :param x:
+        :return:
+        """
         x = np.ravel(x)
         logger.debug('predicting %s', str(x))
         try:
