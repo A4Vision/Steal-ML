@@ -38,6 +38,11 @@ class RBFKernelRetraining(OfflineBase):
         )
 
     def grid_retrain_in_x(self):
+        """
+        Extract the model using an RBF-Kernel SVM,
+        and compare with the original model.
+        :return:
+        """
         gamma_range = np.logspace(-15, 3, 19, base=2)
         param_grid = dict(gamma=gamma_range)
 
@@ -75,8 +80,7 @@ class RBFKernelRetraining(OfflineBase):
         #
         # rbf_svc2 = grid.best_estimator_
 
-        rbf_svc2 = fourier_approx_svm
-        rbf_svc2.fit(self.X_ex, self.y_ex)
+        fourier_approx_svm.fit(self.X_ex, self.y_ex)
 
-        self.set_clf2(rbf_svc2)
+        self.set_clf2(fourier_approx_svm)
         return self.benchmark()
