@@ -1,3 +1,7 @@
+"""
+Minimal matching, line search, data prepare and preprocess.
+"""
+
 import numpy as np
 import pandas as pd
 from scipy.spatial.distance import cdist, pdist, squareform
@@ -5,6 +9,8 @@ from munkres import Munkres
 import sklearn.datasets
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
 from sklearn.cross_validation import train_test_split
+
+
 
 try:
     import matplotlib.pyplot as plt
@@ -224,6 +230,15 @@ def stat_distance(p, q):
 
 
 def min_l1_dist(m1, m2):
+    """
+    Minimum matching of points in m1 with points in m2,
+    where distance between points defined as min(||x-y||, ||x+y||)
+    using the l1 norm.
+    :param m1:
+    :param m2:
+    :return: (total matching weight, matching, indices where
+              min(||x-y||, ||x+y||) = ||x-y||)
+    """
     assert len(m1) == len(m2)
 
     # pairwise l1 distances
@@ -306,6 +321,17 @@ def line_search(X, Y, num_samples, predict_func, eps=1e-1):
 
 
 def _line_search(X, Y, idx1, idx2, predict_func, eps, append=False):
+    """
+    Line search using an oracle, with matrix-operations.
+    :param X:
+    :param Y:
+    :param idx1:
+    :param idx2:
+    :param predict_func:
+    :param eps:
+    :param append:
+    :return:
+    """
     v1 = X[idx1, :]
     y1 = Y[idx1]
     v2 = X[idx2, :]
@@ -343,6 +369,14 @@ def _line_search(X, Y, idx1, idx2, predict_func, eps, append=False):
 
 
 def all_pairs(Y):
+    """
+    List all indices pairs i, j such that:
+        * i < j
+        * Y[i] != Y[j],
+        * j is minimal with respect to these properties.
+    :param Y:
+    :return:
+    """
     classes = pd.Series(Y).unique().tolist()
     return [(i, j)
             for i in range(len(Y))              # go over all points
@@ -364,6 +398,15 @@ def query_count(X, Y, eps):
 
 
 def line_search_oracle(n, budget, predict_func, eps=1e-1):
+    """
+    Find points near the boundary, on the line between pairs from
+    a random set of points.
+    :param n:
+    :param budget:
+    :param predict_func: The oracle.
+    :param eps:
+    :return: points near the decisino boundary if predict_func.
+    """
     X_init = gen_query_set(n, 1)
     Y = predict_func(X_init)
 
@@ -372,6 +415,7 @@ def line_search_oracle(n, budget, predict_func, eps=1e-1):
 
     step = (budget+3)/4
 
+    # Generate random samples using the given budget
     while query_count(X_init, Y, eps) <= budget:
         x = gen_query_set(n, step)
         y = predict_func(x)
@@ -384,6 +428,8 @@ def line_search_oracle(n, budget, predict_func, eps=1e-1):
         return X_init[0:tot_budget]
 
     Y = Y.flatten()
+    # NOTE: We don't actually use all_pairs - for each i,
+    # we select only a single smaller j s.t. Y[i] != Y[j].
     idx1, idx2 = zip(*all_pairs(Y))
     idx1 = list(idx1)
     idx2 = list(idx2)
@@ -401,3 +447,19 @@ def create_dir(path):
     except OSError as exception:
         if exception.errno != errno.EEXIST:
             raise
+
+
+def all_pairs_simple(y):
+    """
+    Naive implementation of all_pairs.
+    :param y:
+    :return:
+    """
+    for i in xrange(len(y)):
+        for j in xrange(i):
+            if y[i] != y[j]:
+                yield i, j
+                break
+
+x = np.array([1, 2, 1, 1, 2])
+assert sorted(all_pairs(x)) == sorted(all_pairs_simple(x))

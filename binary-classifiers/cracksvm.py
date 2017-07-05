@@ -1,5 +1,9 @@
 __author__ = 'Fan'
-
+"""
+Load an SVM model from file, create training data -
+    points on the decision boundary
+Train linear classifier and an RBF-kernel classifier.
+"""
 from math import sqrt
 import os
 import time
@@ -73,6 +77,8 @@ if __name__ == '__main__':
     train_x, train_y = [], []
     val_x, val_y = [], []
     while True:
+        # Training data is points on the decision boundary of the
+        # SVM classifier.
         ex.collect_pts(step)
         train_x.extend(ex.pts_near_b)
         train_y.extend(ex.pts_near_b_labels)

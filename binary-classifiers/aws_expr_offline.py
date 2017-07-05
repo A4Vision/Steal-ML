@@ -1,5 +1,8 @@
 __author__ = 'Fan'
-
+"""
+Load data from file, train linear classifier and
+a polynomial classifier of degree 2.
+"""
 import pickle
 from math import sqrt
 import os
@@ -19,12 +22,12 @@ def run(n_feature, train, validation, test):
     val_x, val_y = validation
     test_x, test_y = test
 
-
     start = time.time()
     ex = RBFKernelRetraining('aws', train_x, train_y,
                              val_x, val_y,
                              test_x, test_y, n_feature, OfflineMethods.RT_in_F)
     print ex.grid_retrain_in_x()
+
     # print ex.grid_retrain_in_f(100)
 
     def quadratic_map(x):
@@ -54,6 +57,7 @@ base_dir = os.getenv('HOME') + '/Dropbox/Projects/SVM/ml-lkYRYeldcrH/'
 q = glob.glob(base_dir + 'e0.1b50s*')
 
 from random import shuffle
+
 shuffle(q)
 
 test_x, test_y = load_svmlight_file(os.getenv('HOME') + '/Dropbox/Projects/SVM/dataset/breast-cancer/bc-test',

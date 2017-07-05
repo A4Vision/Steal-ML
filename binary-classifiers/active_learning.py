@@ -28,8 +28,9 @@ log2n_range = range(7, 13, 1)
 def CAL_v(name, label_p, label_n, oracle, n_features,
           ftype, test_x, test_y):
     """
-    Prints the accuracy of a degree 3 SVM predictor for a varrying amount
-    of "points near the boundary".
+    Prints the test accuracy of an RBF-kernel SVM predictor
+    for a varying amount of "points near the boundary"
+    [boundary of the oracle].
 
     :param name:
     :param label_p:
@@ -72,8 +73,23 @@ def CAL_v(name, label_p, label_n, oracle, n_features,
 
 
 def CAL(name, label_p, label_n, oracle, n_features, ftype, test_x, test_y):
+    """
+    Learn with adaptive learning the oracle, using an SVM
+     with RBF kernel,
+     prints the accuracy as function of amount of queries to
+     the LOCAL MODEL (weird function).
+    :param name:
+    :param label_p:
+    :param label_n:
+    :param oracle:
+    :param n_features:
+    :param ftype:
+    :param test_x:
+    :param test_y:
+    :return:
+    """
     online = OnlineBase(name, label_p, label_n, oracle, n_features, ftype, error=.5)
-
+    # This is weird - the count should be zero here.
     q = online.get_n_query()
     C_range = np.logspace(-2, 5, 10, base=10)
     gamma_range = np.logspace(-5, 1, 10, base=10)
@@ -120,7 +136,7 @@ def CAL(name, label_p, label_n, oracle, n_features, ftype, test_x, test_y):
                 #   is wrong.
                 #   * Otherwise, we are not certain about oracle(x_) - so we
                 #   query the oracle.
-                # Very wierd - add the point as trainig point anyway,
+                # Very weird - add the point as training point anyway,
                 # also when we guess oracle(x_).
                 # Notice: I expect that most of the times, only
                 # the first "if" will take effect and actually run,
@@ -144,20 +160,32 @@ def CAL(name, label_p, label_n, oracle, n_features, ftype, test_x, test_y):
                 h_ = h1
             else:
                 h_ = h2
-        # This is weird - why do we count the queries of online_ ?
-        #
+        # This is weird - why do we count the queries of the local_model ?
+        # I think we should count the queries to the oracle !
         q += local_model.get_n_query()
         pred_y = h_.predict(test_x)
         print q, sm.accuracy_score(test_y, pred_y)
 
 
 def run(train_data, test_data, n_features, labels, gamma, C, feature_type='uniform'):
+    """
+    Load data and call CAL_v.
+    :param train_data:
+    :param test_data:
+    :param n_features:
+    :param labels:
+    :param gamma:
+    :param C:
+    :param feature_type:
+    :return:
+    """
     print train_data
     assert os.path.isfile(train_data), '%s is not a file' % train_data
     assert os.path.isfile(test_data), '%s is not a file' % test_data
 
     X, Y = load_svmlight_file(train_data, n_features=n_features)
     Xt, Yt = load_svmlight_file(test_data, n_features=n_features)
+    # Convert the representation to a standard dense representation.
     Xt = Xt.todense()
 
     if gamma is None:

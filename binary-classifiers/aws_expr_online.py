@@ -1,3 +1,6 @@
+"""
+Gathers some points from an online AWS model.
+"""
 __author__ = 'Fan'
 
 import numpy as np

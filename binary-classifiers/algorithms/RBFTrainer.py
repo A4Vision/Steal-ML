@@ -30,6 +30,9 @@ import os
 
 
 class RBFKernelRetraining(OfflineBase):
+    """
+    Extractor of RBF-kernel SVM.
+    """
     def __init__(self, oracle, retrain_xy, test_xy, n_features):
         X_ex, y_ex = retrain_xy
         X_test, y_test = test_xy
@@ -41,7 +44,7 @@ class RBFKernelRetraining(OfflineBase):
         """
         Extract the model using an RBF-Kernel SVM,
         and compare with the original model.
-        :return:
+        :return: benchmark results.
         """
         gamma_range = np.logspace(-15, 3, 19, base=2)
         param_grid = dict(gamma=gamma_range)
@@ -67,6 +70,13 @@ class RBFKernelRetraining(OfflineBase):
         # return self.grid_retrain_in_f()
 
     def grid_retrain_in_f(self, n_dim=500):
+        """
+        Extract the model using a linear classifier
+        over an approximate feature map of an RBF-kernel.
+        Uses the data points given in the constructor.
+        :param n_dim:
+        :return: benchmark results.
+        """
         rbf_map = RBFSampler(n_dim, random_state=1)
         fourier_approx_svm = pipeline.Pipeline([("mapper", rbf_map),
                                                 ("svm", LinearSVC())])

@@ -27,13 +27,19 @@ class MidpointNormalize(Normalize):
 
 
 class GridRBFSolver(OnlineBase):
+    """
+    Extractor of an RBF svm, using an equation solving approach.
+    """
+
     def __init__(self, name, clf1, data, label, ftype, error):
         super(self.__class__, self).__init__(name, clf1, data,
                                              label, ftype, error)
 
     def do(self, n_pts):
         """
-        Extract the model by training our model
+        Extract the model using a linear classifier
+        over an approximate feature map of an RBF-kernel.
+
         with n pairs of points on the decision boundary
         of the ATTACKED MODEL.
         :param n_pts:

@@ -4,8 +4,15 @@ import numpy as np
 from sklearn.metrics import accuracy_score
 
 class OfflineMethods:
+    # Extract a model by training a linear classifier over the features/
+    # artificial features s.t. the kernel is well approximated with the
+    # standard R^n inner product.
     RT_in_F = 'retrain in F'
+    # Extract a model by training a classifier over the data,
+    # possibly using a kernel method.
     RT_in_X = 'retrain in X'
+    # Extract a model by finding a hyperplane that is close to a set
+    # of points on the decision boundary of the online model.
     SLV_in_F = 'solve in F'
 
 
