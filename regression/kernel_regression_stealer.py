@@ -20,27 +20,52 @@ import math
 
 
 class KernelLayer(object):
-    def __init__(self, input, gamma, n_out, Y, learn_Y=True, W=None, b=None):
+    """
+    Multilabel classifier softmax over an RBK kernel.
+
+    fmap = the mapping function of an RBF
+        probs = Softmax(W * fmap(x) + b)
+        prediction = argmax(probs)
+
+    Implemented using the kernel trick:
+        K = The kernel matrix. K[i][j] = K(X[i], Y[j])
+        X = inputs for prediction
+        probs = Softmax(W * K + b) # With broadcasting....
+    """
+    def __init__(self, input, gamma, n_out, kernel_base, learn_kernel_base=True, W=None, b=None):
+        """
+
+        :param input: matrix of input for prediction.
+        input[i] is a data point.
+        :param gamma:
+        :param n_out: Labels amount.
+        :param kernel_base: matrix of inputs used in training.
+        Since we use the kernel trick, we need the training inputs
+        for each prediction.
+        :param learn_kernel_base:
+        :param W:
+        :param b:
+        """
 
         self.gamma = gamma
 
-        if not isinstance(Y, T.sharedvar.SharedVariable):
-            Y = theano.shared(
+        if not isinstance(kernel_base, T.sharedvar.SharedVariable):
+            kernel_base = theano.shared(
                 value=numpy.array(
-                    Y,
+                    kernel_base,
                     dtype=theano.config.floatX
                 ),
                 name='Y',
                 borrow=True
             )
 
-        self.Y = Y
+        self.kernel_base = kernel_base
 
         if W is None:
             # initialize with 0 the weights W
             W = theano.shared(
                 value=numpy.zeros(
-                    (Y.get_value().shape[0], n_out),
+                    (kernel_base.get_value().shape[0], n_out),
                     dtype=theano.config.floatX
                 ),
                 name='W',
@@ -61,8 +86,9 @@ class KernelLayer(object):
         self.W = W
         self.b = b
 
-        Y1 = Y[numpy.newaxis, :, :]
+        Y1 = kernel_base[numpy.newaxis, :, :]
         X1 = input[:, numpy.newaxis, :]
+        # rbf[i][j] = exp(-gamma * sum((Y[i] - inputs[j]) ** 2))
         rbf = T.exp(-gamma * T.sum((Y1-X1)**2, axis=-1))
 
         self.p_y_given_x = T.nnet.softmax(T.dot(rbf, self.W) + self.b)
@@ -81,15 +107,21 @@ class KernelLayer(object):
 
         self.input = input
 
-        if learn_Y:
-            self.params = [self.Y, self.W, self.b]
+        if learn_kernel_base:
+            self.params = [self.kernel_base, self.W, self.b]
         else:
             self.params = [self.W, self.b]
 
     def negative_log_likelihood(self, y):
-        return -T.mean(T.log(self.p_y_given_x) * y)
+            return -T.mean(T.log(self.p_y_given_x) * y)
 
     def errors(self, y):
+        """
+        Error rate.
+        :param y: the actual labels.
+        :return:
+        """
+
         if y.ndim != self.y_pred.ndim:
             raise TypeError(
                 'y should have the same shape as self.y_pred',
@@ -103,15 +135,17 @@ class KernelLayer(object):
 
 
 class KernelLog(object):
-
-    def __init__(self, input, gamma, n_out, Y, learn_Y=True, W=None, b=None):
+    """
+    KernelLayer with L2_sqr for regularization.
+    """
+    def __init__(self, input, gamma, n_out, kernel_base, learn_kernel_base=True, W=None, b=None):
 
         self.kernelLayer = KernelLayer(
             input=input,
             gamma=gamma,
             n_out=n_out,
-            Y=Y,
-            learn_Y=learn_Y,
+            kernel_base=kernel_base,
+            learn_kernel_base=learn_kernel_base,
             W=W,
             b=b
         )
@@ -133,6 +167,10 @@ class KernelLog(object):
 
 
 def apply_nesterov_momentum(updates, params, g):
+    # Probably a BUGGY implementation of Nesterov momentum.
+    # See (probably) good implementation at
+    # https://github.com/Lasagne/Lasagne/blob/master/lasagne/updates.py#L263
+
     if params is None:
         params = updates.keys()
     updates = OrderedDict(updates)
@@ -140,16 +178,23 @@ def apply_nesterov_momentum(updates, params, g):
     for param in params:
         value = param.get_value(borrow=True)
 
-        y = theano.shared(numpy.zeros(value.shape, dtype=value.dtype),
+        prev = theano.shared(numpy.zeros(value.shape, dtype=value.dtype),
                           broadcastable=param.broadcastable)
 
-        updates[y] = updates[param]
-        updates[param] = (1 - g) * updates[param] + g * y
+        updates[prev] = updates[param]
+        updates[param] = (1 - g) * updates[param] + g * prev
 
     return updates
 
 
 def shared_dataset(data_xy, borrow=True):
+    """
+    Create shared variables with the given data.
+    :param data_xy:
+    :param borrow:
+    :return:
+    """
+
     data_x, data_y = data_xy
 
     shared_x = theano.shared(numpy.asarray(data_x,
@@ -183,6 +228,14 @@ def predict_probas(model, test_set_x):
 
 
 def calculate_loss(model, X, y, reg):
+    """
+        CrossEntropy + reg * ||W|| ** 2
+    :param model:
+    :param X:
+    :param y:
+    :param reg:
+    :return:
+    """
     y_pred = predict_probas(model, X)
 
     return - numpy.mean(y * numpy.log(y_pred)) + reg * model.L2_sqr.eval()
@@ -190,7 +243,7 @@ def calculate_loss(model, X, y, reg):
 
 def save(model, filename):
     with open(filename, 'wb') as f:
-        cPickle.dump([model.params, model.kernelLayer.Y,
+        cPickle.dump([model.params, model.kernelLayer.kernel_base,
                       model.kernelLayer.gamma], f, cPickle.HIGHEST_PROTOCOL)
 
 
@@ -209,12 +262,12 @@ def load(filename):
         input=x,
         gamma=gamma,
         n_out=n_out,
-        Y=Y,
+        kernel_base=Y,
         W=W,
         b=b
     )
 
-    classifier.kernelLayer.Y = Y
+    classifier.kernelLayer.kernel_base = Y
     classifier.kernelLayer.W = W
     classifier.kernelLayer.b = b
 
@@ -228,6 +281,29 @@ def build_model(X_repr, learn_kernel, X, y, gamma=1, epsilon=1e-5,
                 reg_lambda=0.0001, num_passes=10000, eps_factor=0.99,
                 epoch=1000, print_loss=False, print_epoch=1000,
                 batch_size=None, warm_start=None):
+    """
+
+    NOTE: X_repr is just a set of random points (randomized once) -
+            weird to use it as a kernel.
+        It seems like an abuse of the kernel trick
+    :param X_repr: The kernel base for the classifier.
+    :param learn_kernel: Whether to learn the kernel base.
+    :param X: training data.
+    :param y: training data probabilities !!
+    :param gamma: Parameter for the RBF kernel.
+    :param epsilon: learning rate.
+    :param reg_lambda: l2 regularization coefficient - CE + reg_lambda * ||W|| ** 2
+    :param num_passes: number of iterations over the whole data during the training.
+    :param eps_factor: factor to update the learning rate once in every epoch.
+        learning_rate *= eps_factor
+    :param epoch: how many passes over the whole data are considered an epoch.
+    :param print_loss:
+    :param print_epoch:
+    :param batch_size: SGD mini batch size. (batch==minimbatch)
+    :param warm_start: LogKernel or None.
+    Initial state for the classifier.
+    :return:
+    """
 
     nn_hdim = X_repr.shape[0]
     n_out = y.shape[1]
@@ -262,16 +338,16 @@ def build_model(X_repr, learn_kernel, X, y, gamma=1, epsilon=1e-5,
             input=x_var,
             gamma=gamma,
             n_out=n_out,
-            Y=X_repr,
-            learn_Y=learn_kernel
+            kernel_base=X_repr,
+            learn_kernel_base=learn_kernel
         )
     else:
         classifier = KernelLog(
             input=x_var,
             gamma=gamma,
             n_out=n_out,
-            Y=warm_start.kernelLayer.Y,
-            learn_Y=learn_kernel,
+            kernel_base=warm_start.kernelLayer.kernel_base,
+            learn_kernel_base=learn_kernel,
             W=warm_start.kernelLayer.W,
             b=warm_start.kernelLayer.b
         )
@@ -312,7 +388,7 @@ def build_model(X_repr, learn_kernel, X, y, gamma=1, epsilon=1e-5,
         if learn_kernel:
             Y = coeffs[offset:offset+X_repr.shape[0]*X_repr.shape[1]].reshape((X_repr.shape[0], X_repr.shape[1]))
             offset += X_repr.shape[0] * X_repr.shape[1]
-            classifier.kernelLayer.Y.set_value(Y, borrow=True)
+            classifier.kernelLayer.kernel_base.set_value(Y, borrow=True)
 
         W = coeffs[offset:offset+nn_hdim*n_out].reshape((nn_hdim, n_out))
         offset += nn_hdim*n_out
@@ -331,7 +407,7 @@ def build_model(X_repr, learn_kernel, X, y, gamma=1, epsilon=1e-5,
         if learn_kernel:
             Y = coeffs[offset:offset+X_repr.shape[0]*X_repr.shape[1]].reshape((X_repr.shape[0], X_repr.shape[1]))
             offset += X_repr.shape[0] * X_repr.shape[1]
-            classifier.kernelLayer.Y.set_value(Y, borrow=True)
+            classifier.kernelLayer.kernel_base.set_value(Y, borrow=True)
 
         W = coeffs[offset:offset+nn_hdim*n_out].reshape((nn_hdim, n_out))
         offset += nn_hdim*n_out
@@ -351,7 +427,7 @@ def build_model(X_repr, learn_kernel, X, y, gamma=1, epsilon=1e-5,
         if learn_kernel:
             Y = coeffs[offset:offset+X_repr.shape[0]*X_repr.shape[1]].reshape((X_repr.shape[0], X_repr.shape[1]))
             offset += X_repr.shape[0] * X_repr.shape[1]
-            classifier.kernelLayer.Y.set_value(Y, borrow=True)
+            classifier.kernelLayer.kernel_base.set_value(Y, borrow=True)
 
         W = coeffs[offset:offset+nn_hdim*n_out].reshape((nn_hdim, n_out))
         offset += nn_hdim*n_out
@@ -393,7 +469,7 @@ def build_model(X_repr, learn_kernel, X, y, gamma=1, epsilon=1e-5,
     if learn_kernel:
             Y = coeffs[offset:offset+X_repr.shape[0]*X_repr.shape[1]].reshape((X_repr.shape[0], X_repr.shape[1]))
             offset += X_repr.shape[0] * X_repr.shape[1]
-            classifier.kernelLayer.Y.set_value(Y, borrow=True)
+            classifier.kernelLayer.kernel_base.set_value(Y, borrow=True)
 
     W = coeffs[offset:offset+nn_hdim*n_out].reshape((nn_hdim, n_out))
     offset += nn_hdim*n_out
@@ -406,7 +482,7 @@ def build_model(X_repr, learn_kernel, X, y, gamma=1, epsilon=1e-5,
 
     # compute the gradient of cost
     gparams = [T.grad(cost, param) for param in classifier.params]
-
+    # learning rate
     l_r = T.scalar('l_r', dtype=theano.config.floatX)
     updates = [
         (param, param - l_r * gparam)
@@ -513,11 +589,34 @@ class KernelRegressionExtractor(object):
         return
 
     def extract(self, X_train, y_train, num_repr, budget, steps=[],
-                adaptive_oracle=False, baseline=False,
-                gamma=1, epsilon=1e-2, reg_lambda=1e-16,  eps_factor=0.99,
+                adaptive_oracle=False, use_labels_only=False,
+                gamma=1, epsilon=1e-2, reg_lambda=1e-16, eps_factor=0.99,
                 epoch=100, print_epoch=10, batch_size=1, num_passes=1000,
                 random_seed=0):
-
+        """
+        Extracts a logistic regression multilabl classifier with RBF kernel
+         for self.query
+        :param X_train: For plotting
+        :param y_train:  For plotting
+        :param num_repr: amount of vectors in the kernel base.
+        :param budget: total amount of queries to the oracle.
+        :param steps: monotoincally increasing list of queries amounts.
+        :param adaptive_oracle: whether to query the oracle using line search,
+            or use only random inputs.
+        :param use_labels_only: Whether to use only the labels in training.
+        :param gamma: coefficient for the RBF kernel
+        :param epsilon: initial learining rate.
+        :param reg_lambda: regularization coefficient.
+        :param eps_factor: update factor for the learning rate.
+        Once in every epoch:
+            learning_rate *= eps_factor
+        :param epoch: how many iterations over the whole training data count as a n epoch.
+        :param print_epoch:
+        :param batch_size:
+        :param num_passes: how many iterations over the whole data should we do in each training.
+        :param random_seed:
+        :return:
+        """
         numpy.random.seed(random_seed)
 
         assert not (adaptive_oracle and steps)
@@ -543,9 +642,11 @@ class KernelRegressionExtractor(object):
 
             y_ext = self.query(X_ext)
 
-            if not baseline:
+            if not use_labels_only:
                 y_ext_p = self.query_probas(X_ext)
             else:
+                # When this a baseline, take the labels from the query result
+                # as one-hot vectors to be the probability vectors.
                 num_classes = len(self.get_classes())
                 y_ext_p = numpy.zeros((len(y_ext), num_classes))
                 y_ext_p[numpy.arange(len(y_ext)), y_ext] = 1
@@ -563,7 +664,7 @@ class KernelRegressionExtractor(object):
                                 epoch=epoch, print_epoch=print_epoch,
                                 batch_size=batch_size, warm_start=model)
 
-            mtype = "base" if baseline else "extr"
+            mtype = "base" if use_labels_only else "extr"
             mode = "adapt-local" if steps \
                 else "adapt-oracle" if adaptive_oracle \
                 else "passive"
@@ -606,7 +707,7 @@ class KernelRegressionExtractor(object):
 
         numpy.set_printoptions(threshold='nan')
 
-        oracle_repr = numpy.array(model_bb.kernelLayer.Y.eval())
+        oracle_repr = numpy.array(model_bb.kernelLayer.kernel_base.eval())
 
         if verbose:
             print 'Oracle representers:'
@@ -620,7 +721,7 @@ class KernelRegressionExtractor(object):
                     ), 1)
             print numpy.round(oracle_repr[0:20], 2)
 
-        ext_repr = numpy.array(model_ext.kernelLayer.Y.eval())
+        ext_repr = numpy.array(model_ext.kernelLayer.kernel_base.eval())
 
         if verbose:
             print 'representers:'
@@ -629,7 +730,7 @@ class KernelRegressionExtractor(object):
                     numpy.array(
                         sorted(
                             scaler.inverse_transform(
-                                model_ext.kernelLayer.Y.eval()),
+                                model_ext.kernelLayer.kernel_base.eval()),
                             key=lambda d: tuple(d)
                         )
                     ), 1)

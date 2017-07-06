@@ -142,7 +142,7 @@ class LocalKernelExtractor(KernelRegressionExtractor):
             )
 
         model_bb = krs.KernelLog(T.matrix('x'), best_gamma, len(self.classes),
-                                 X_repr_bb, learn_Y=False, W=W, b=b)
+                                 X_repr_bb, learn_kernel_base=False, W=W, b=b)
         y_pred_bb = krs.predict(model_bb, X_test)
 
         print 'Best Gamma: {}'.format(best_gamma)
@@ -239,7 +239,7 @@ def main():
         if gamma is None:
             gamma = ext.get_gamma()
         ext.extract(X_train, y_train, num_repr, budget, gamma=gamma, steps=steps,
-                    adaptive_oracle=adaptive_oracle, baseline=True,
+                    adaptive_oracle=adaptive_oracle, use_labels_only=True,
                     num_passes=num_passes, epsilon=epsilon, random_seed=seed,
                     batch_size=batch_size, reg_lambda=1e-40)
     elif action == "compare":

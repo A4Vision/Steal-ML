@@ -371,7 +371,7 @@ def _line_search(X, Y, idx1, idx2, predict_func, eps, append=False):
 def all_pairs(Y):
     """
     List all indices pairs i, j such that:
-        * i < j
+        * j < i
         * Y[i] != Y[j],
         * j is minimal with respect to these properties.
     :param Y:
