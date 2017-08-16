@@ -12,7 +12,9 @@ import sys
 
 
 class LocalKernelExtractor(KernelRegressionExtractor):
-
+    """
+    Kernel extractor, with rounding on probas.
+    """
     def __init__(self, dataset, X_train, y_train, rounding):
         self.X_train = X_train
         self.y_train = y_train

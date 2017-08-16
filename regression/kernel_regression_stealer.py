@@ -21,14 +21,14 @@ import math
 
 class KernelLayer(object):
     """
-    Multilabel classifier softmax over an RBK kernel.
+    Multi label classifier softmax over an RBF kernel.
 
     fmap = the mapping function of an RBF
         probs = Softmax(W * fmap(x) + b)
         prediction = argmax(probs)
 
     Implemented using the kernel trick:
-        K = The kernel matrix. K[i][j] = K(X[i], Y[j])
+        K = The kernel matrix. K[i][j] = K(X[i], kernel_base[j])
         X = inputs for prediction
         probs = Softmax(W * K + b) # With broadcasting....
     """
@@ -39,9 +39,8 @@ class KernelLayer(object):
         input[i] is a data point.
         :param gamma:
         :param n_out: Labels amount.
-        :param kernel_base: matrix of inputs used in training.
-        Since we use the kernel trick, we need the training inputs
-        for each prediction.
+        :param kernel_base: matrix of points.
+        Since we use the kernel trick, we need a kernel base for each prediction.
         :param learn_kernel_base:
         :param W:
         :param b:
@@ -88,7 +87,7 @@ class KernelLayer(object):
 
         Y1 = kernel_base[numpy.newaxis, :, :]
         X1 = input[:, numpy.newaxis, :]
-        # rbf[i][j] = exp(-gamma * sum((Y[i] - inputs[j]) ** 2))
+        # rbf[i][j] = exp(-gamma * sum((kernel_base[i] - inputs[j]) ** 2))
         rbf = T.exp(-gamma * T.sum((Y1-X1)**2, axis=-1))
 
         self.p_y_given_x = T.nnet.softmax(T.dot(rbf, self.W) + self.b)
@@ -276,7 +275,7 @@ def load(filename):
 
 i = 0
 
-
+7
 def build_model(X_repr, learn_kernel, X, y, gamma=1, epsilon=1e-5,
                 reg_lambda=0.0001, num_passes=10000, eps_factor=0.99,
                 epoch=1000, print_loss=False, print_epoch=1000,
@@ -702,6 +701,15 @@ class KernelRegressionExtractor(object):
                 X_ext = numpy.vstack((samples, X_random, X_ext))
 
     def compare_models(self, model_ext, samples, verbose=True, scaler=None):
+        """
+        Compare the extracted model with the oracle model from the file.
+        :param model_ext: The extracted model.
+        :type model_ext: KernelLog
+        :param samples: Number of samples.
+        :param verbose:
+        :param scaler:
+        :return:
+        """
         model_bb = \
             load('experiments/KLR/{}/models/oracle.pkl'.format(self.dataset))
 

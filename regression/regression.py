@@ -8,7 +8,9 @@ import matplotlib.pyplot as plt
 
 class LocalRegressionExtractor(RegressionExtractor):
     """
-    Local logistic regression using the implementation in scikit
+    Local logistic regression using the implementation in scikit.
+
+    The constructor creates the oracle.
     """
 
     def __init__(self, X, y, multinomial, rounding=None):
@@ -17,7 +19,9 @@ class LocalRegressionExtractor(RegressionExtractor):
         self.rounding = rounding
 
         # train a model on the whole dataset
+        # self.model is the oracle.
         if multinomial:
+            # sovler: the optimization method.
             self.model = LogisticRegression(multi_class="multinomial",
                                             solver='lbfgs')
         else:
@@ -37,12 +41,18 @@ class LocalRegressionExtractor(RegressionExtractor):
         return self.classes
 
     def query_probas(self, X):
+        """
+        Call to the oracle on X.
+        :param X:
+        :return:
+        """
         #
         # There seems to be a bug in the LogisticRegression class, that makes
         # it use the OvR strategy to compute probabilities even when we set
         # 'multi_class = multinomial'. So we call the predict_probas method
         # ourselves.
-        #
+
+        # New comment: Probably there is a BUG here because LogisticRegression.predict_proba() calculates softmax well.
         p = predict_probas(X, self.w, self.intercept,
                            multinomial=(self.model.multi_class == "multinomial")
                            )
@@ -51,6 +61,7 @@ class LocalRegressionExtractor(RegressionExtractor):
             return p
         else:
             p = np.round(p, self.rounding)
+            # Re-normalize - make sure each row is a probability vector.
             return p / np.sum(p, axis=1)[:, np.newaxis]
 
     def query(self, X):

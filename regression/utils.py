@@ -362,6 +362,17 @@ def line_search(X, Y, num_samples, predict_func, eps=1e-1):
 
 
 def _line_search(X, Y, idx1, idx2, predict_func, eps, append=False):
+    """
+    Matrix-wise efficient line search.
+    :param X:
+    :param Y:
+    :param idx1:
+    :param idx2:
+    :param predict_func:
+    :param eps:
+    :param append:
+    :return: matrix with the points - of both labels.
+    """
     v1 = X[idx1, :]
     y1 = Y[idx1]
     v2 = X[idx2, :]

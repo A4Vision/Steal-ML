@@ -384,8 +384,13 @@ class RegressionExtractor(object):
                                               logistic_grad, X, Y, wdim)
 
         return wopt, int_opt, len(X)
-    
+
     def find_coeffs_bin(self, budget):
+        """
+        Extract a binary classifier by solving equations.
+        :param budget:
+        :return:
+        """
         k = len(self.classes)       # number of classes
         assert k == 2
         n = self.num_features()     # vector dimension
@@ -411,6 +416,14 @@ class RegressionExtractor(object):
         return w_opt, int_opt
 
     def find_coeffs_adaptive(self, step, query_budget, baseline=False):
+        """
+        Extract the parameters, using adaptive learning - query
+        the oracle with points nead the LOCAL decision boundary.
+        :param step:
+        :param query_budget:
+        :param baseline:
+        :return:
+        """
         assert query_budget > 0
         k = len(self.classes)       # number of classes
         n = self.num_features()     # vector dimension
@@ -441,22 +454,30 @@ class RegressionExtractor(object):
 
                 if len(pd.Series(Y_local[0:100]).unique()) == 1 \
                         or callable(getattr(self, 'encode', None)):
+                    # If we DO have an "encode" function
                     Y_local_p = predict_func_p(X_local)
 
                     if Y_local_p.ndim == 1 or Y_local_p.shape[1] == 1:
+                        # Weird line:
+                        # if Y_local_p.ndim == 1, then after hstack, Y_local_p is still one dimensional.
                         Y_local_p = np.hstack([1 - Y_local_p, Y_local_p])
 
+                    # sort each column.
                     Y_local_p.sort()
+                    # Second column - First column: how much we are certain about the prediction
                     scores = Y_local_p[:, -1] - Y_local_p[:, -2]
 
                     adaptive_budget = (min(step, query_budget)*3)/4
                     random_budget = min(step, query_budget) - adaptive_budget
 
+                    # Take the indices of the lowest scores
                     indices = scores.argsort()[0:adaptive_budget]
+                    # The rows with lowest scores.
                     samples = X_local[indices, :]
                     X_random = self.gen_query_set(n, random_budget)
                     samples = np.vstack((samples, X_random))
                 else:
+                    # If we DO NOT have an "encode" function
                     # reserve some budget for random queries
                     adaptive_budget = (min(step, query_budget)*3)/4
                     adaptive_budget += adaptive_budget % 2
