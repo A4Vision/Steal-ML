@@ -73,7 +73,7 @@ def prepare_data(name, onehot=True, labelEncode=True):
     elif name == "att_faces":
         return prepare_att_faces()
     else:
-        raise ValueError('Unknown dataset %s', name)
+        raise ValueError('Unknown dataset %s' % name)
 
     if SCALE_TYPE in ["uniform", "uniform_int", "norm"]:
         scaler = MinMaxScaler(feature_range=(-1, 1))
